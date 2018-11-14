@@ -91,7 +91,7 @@ static void rti_thread_inited(rt_thread_t thread);
 static void rti_thread_suspend(rt_thread_t thread);
 static void rti_thread_resume(rt_thread_t thread);
 static void rti_scheduler(rt_thread_t from, rt_thread_t to);
-static void rti_object_attach(rt_object_t object);
+//static void rti_object_attach(rt_object_t object);
 static void rti_object_detach(rt_object_t object);
 static void rti_interrupt_enter(void);
 static void rti_interrupt_leave(void);
@@ -115,6 +115,7 @@ static void rti_thread_inited(rt_thread_t thread)
     if (!rti_status.enable || rti_status.disable_nest[RTI_THREAD_NUM])
         return ;
     rti_thread_create((rt_uint32_t)thread);
+    rti_send_thread_info(thread);
 }
 
 static void rti_thread_suspend(rt_thread_t thread)
@@ -142,26 +143,26 @@ static void rti_scheduler(rt_thread_t from, rt_thread_t to)
         rti_thread_start_exec((rt_uint32_t)to);
 }
 
-static void rti_object_attach(rt_object_t object)
-{
-    if (!rti_status.enable || rti_status.disable_nest[RTI_THREAD_NUM])
-        return ;
-    switch (object->type)
-    {
-    case RT_Object_Class_Thread:
-        rti_thread_create((rt_uint32_t)object);
-        rti_send_thread_info((rt_thread_t)object);
-        break;
-    default:
-        break;
-    }
-}
+//static void rti_object_attach(rt_object_t object)
+//{
+//    if (!rti_status.enable || rti_status.disable_nest[RTI_THREAD_NUM])
+//        return ;
+//    switch (object->type & (~RT_Object_Class_Static))
+//    {
+//    case RT_Object_Class_Thread:
+//        rti_thread_create((rt_uint32_t)object);
+//        rti_send_thread_info((rt_thread_t)object);
+//        break;
+//    default:
+//        break;
+//    }
+//}
 
 static void rti_object_detach(rt_object_t object)
 {
     if (!rti_status.enable || rti_status.disable_nest[RTI_THREAD_NUM])
         return ;
-    switch (object->type)
+    switch (object->type & (~RT_Object_Class_Static))
     {
     case RT_Object_Class_Thread:
         rti_thread_stop_exec();
@@ -737,7 +738,7 @@ static int rti_init(void)
         return -1;
     }
     /* register hooks */
-    rt_object_attach_sethook(rti_object_attach);
+    //rt_object_attach_sethook(rti_object_attach);
     rt_object_detach_sethook(rti_object_detach);
     rt_object_trytake_sethook(rti_object_trytake);
     rt_object_take_sethook(rti_object_take);
