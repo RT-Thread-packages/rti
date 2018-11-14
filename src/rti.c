@@ -65,6 +65,7 @@ static void rti_isr_enter(void);
 static void rti_isr_exit(void);
 static void rti_isr_to_scheduler(void);
 static void rti_enter_timer(rt_uint32_t timer);
+static void rti_exit_timer(rt_uint32_t timer);
 static void rti_thread_start_exec(rt_uint32_t thread);
 static void rti_thread_stop_exec(void);
 static void rti_thread_start_ready(rt_uint32_t thread);
@@ -86,7 +87,8 @@ static rt_uint8_t *rti_encode_str(rt_uint8_t *present, const char *ptr, rt_uint8
 static rt_uint32_t rti_shrink_id(rt_uint32_t Id);
 
 /* rti hook functions */
-static void rti_timer_timeout(rt_timer_t t);
+static void rti_timer_enter(rt_timer_t t);
+static void rti_timer_exit(rt_timer_t t);
 static void rti_thread_inited(rt_thread_t thread);
 static void rti_thread_suspend(rt_thread_t thread);
 static void rti_thread_resume(rt_thread_t thread);
@@ -103,11 +105,18 @@ static int rti_init(void);
 static rt_size_t rti_data_put(const rt_uint8_t *ptr, rt_uint16_t length);
 
 /* rti hook functions */
-static void rti_timer_timeout(rt_timer_t t)
+static void rti_timer_enter(rt_timer_t t)
 {
     if (!rti_status.enable || rti_status.disable_nest[RTI_TIMER_NUM])
         return ;
     rti_enter_timer((rt_uint32_t)t);
+}
+
+static void rti_timer_exit(rt_timer_t t)
+{
+    if (!rti_status.enable || rti_status.disable_nest[RTI_TIMER_NUM])
+        return ;
+    rti_exit_timer((rt_uint32_t)t);
 }
 
 static void rti_thread_inited(rt_thread_t thread)
@@ -413,6 +422,11 @@ static void rti_isr_to_scheduler(void)
 static void rti_enter_timer(rt_uint32_t timer)
 {
     rti_send_packet_value(RTI_ID_TIMER_ENTER, rti_shrink_id(timer));
+}
+
+static void rti_exit_timer(rt_uint32_t timer)
+{
+    rti_send_packet_void(RTI_ID_TIMER_EXIT);
 }
 
 static void rti_thread_start_exec(rt_uint32_t thread)
@@ -749,7 +763,8 @@ static int rti_init(void)
     rt_thread_inited_sethook(rti_thread_inited);
     rt_scheduler_sethook(rti_scheduler);
 
-    rt_timer_timeout_sethook(rti_timer_timeout);
+    rt_timer_enter_sethook(rti_timer_enter);
+    rt_timer_exit_sethook(rti_timer_exit);
 
     rt_interrupt_enter_sethook(rti_interrupt_enter);
     rt_interrupt_leave_sethook(rti_interrupt_leave);
