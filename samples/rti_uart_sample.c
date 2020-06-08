@@ -31,17 +31,21 @@
 #include <finsh.h>
 #endif
 
-#define BUF_SIZE                 (512)
-#define UART_CHANGE              "uart3"
-#define UART_BAUD_RATE           BAUD_RATE_921600
+#ifndef PKG_RTI_UART_BAUD_RATE
+#define PKG_RTI_UART_BAUD_RATE   BAUD_RATE_460800
+#endif
 
-static rt_uint8_t buf[BUF_SIZE];
+#define TRANSIT_BUF_SIZE         (PKG_RTI_BUFFER_SIZE / 8)
+#define RTI_UART_BAUD_RATE       (PKG_RTI_UART_BAUD_RATE)
+#define RTI_UART_NAME            "rti_uart"
+
+static rt_uint8_t transit_buf[TRANSIT_BUF_SIZE];
 static rt_device_t rti_dev;
 
 void rti_data_new_data_notify(void)
 {
-    int ret = rti_data_get(buf, BUF_SIZE);
-    rt_device_write(rti_dev, 0, buf, ret);
+    int ret = rti_data_get(transit_buf, TRANSIT_BUF_SIZE);
+    rt_device_write(rti_dev, 0, transit_buf, ret);
 }
 
 rt_err_t rt_ind(rt_device_t dev, rt_size_t size)
@@ -58,13 +62,13 @@ void rti_uart_sample(void)
     rti_dev = rt_console_get_device();
 
 #ifdef RT_USING_FINSH
-    finsh_set_device(UART_CHANGE);
+    finsh_set_device(RTI_UART_NAME);
 #endif
-    rt_console_set_device(UART_CHANGE);
+    rt_console_set_device(RTI_UART_NAME);
 
     rti_dev->open_flag &= ~RT_DEVICE_FLAG_STREAM;
 
-    config.baud_rate = UART_BAUD_RATE;
+    config.baud_rate = RTI_UART_BAUD_RATE;
     rt_device_control(rti_dev, RT_DEVICE_CTRL_CONFIG, &config);
 
     rt_device_set_rx_indicate(rti_dev, rt_ind);
@@ -73,3 +77,62 @@ void rti_uart_sample(void)
 #ifdef RT_USING_FINSH
 MSH_CMD_EXPORT(rti_uart_sample, start record by uart.);
 #endif
+
+/*
+ * rti uart device
+ */
+
+#define RTI_UART_BUF             (128)
+static char uart_buf[RTI_UART_BUF];
+static struct rt_serial_device rti_serial;
+
+static rt_err_t rti_uart_configure(struct rt_serial_device *serial, struct serial_configure *cfg)
+{
+    return RT_EOK;
+}
+static rt_err_t rti_uart_control(struct rt_serial_device *serial, int cmd, void *arg)
+{
+    return RT_EOK;
+}
+static int rti_uart_putc(struct rt_serial_device *serial, char c)
+{
+    static int index = 0;
+    uart_buf[index++] = c;
+    if (c == '\n' || index == RTI_UART_BUF - 1)
+    {
+        uart_buf[index] = '\0';
+        rti_print(uart_buf);
+        index = 0;
+    }
+    return 1;
+}
+static int rti_uart_getc(struct rt_serial_device *serial)
+{
+    return 0;
+}
+
+static const struct rt_uart_ops rti_uart_ops =
+{
+    .configure = rti_uart_configure,
+    .control = rti_uart_control,
+    .putc = rti_uart_putc,
+    .getc = rti_uart_getc,
+    .dma_transmit = RT_NULL
+};
+
+static int rti_uart_init(void)
+{
+    struct serial_configure config = RT_SERIAL_CONFIG_DEFAULT;
+    rt_err_t result = 0;
+
+    /* init rti_uart object */
+    rti_serial.ops    = &rti_uart_ops;
+    rti_serial.config = config;
+
+    /* register rti_uart device */
+    result = rt_hw_serial_register(&rti_serial, RTI_UART_NAME,
+                                   RT_DEVICE_FLAG_RDWR | RT_DEVICE_FLAG_INT_RX,
+                                   NULL);
+    return result;
+}
+INIT_APP_EXPORT(rti_uart_init);
