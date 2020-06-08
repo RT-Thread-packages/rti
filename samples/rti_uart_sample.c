@@ -108,7 +108,7 @@ static int rti_uart_putc(struct rt_serial_device *serial, char c)
 }
 static int rti_uart_getc(struct rt_serial_device *serial)
 {
-    return 0;
+    return -1;
 }
 
 static const struct rt_uart_ops rti_uart_ops =
