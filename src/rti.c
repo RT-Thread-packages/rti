@@ -564,6 +564,19 @@ static void rti_send_packet_value(rt_uint8_t rti_id, rt_uint32_t value)
     rti_send_packet(rti_id, start, present);
 }
 
+void rti_print(const char *s)
+{
+    rt_uint8_t packet[RTI_INFO_SIZE + 2 * RTI_VALUE_SIZE + RTI_MAX_STRING_LEN];
+    rt_uint8_t *start, *present;
+
+    start = rti_record_ready(packet);
+    present = rti_encode_str(start, s, RTI_MAX_STRING_LEN);
+    present = rti_encode_val(present, RTI_LOG);
+    present = rti_encode_val(present, 0);
+
+    rti_send_packet(RTI_ID_PRINT_FORMATTED, start, present);
+}
+
 static void rti_send_packet(rt_uint8_t rti_id, rt_uint8_t *packet_sta, rt_uint8_t *packet_end)
 {
     rt_uint16_t  len;
@@ -617,7 +630,9 @@ static void rti_send_packet(rt_uint8_t rti_id, rt_uint8_t *packet_sta, rt_uint8_
     rti_status.time_stamp_last = time_stamp;
 }
 
-/* rti api */
+/*
+ * rti api function.
+ */
 void rti_data_new_data_notify_set_hook(void (*hook)(void))
 {
     rti_data_new_data_notify = hook;

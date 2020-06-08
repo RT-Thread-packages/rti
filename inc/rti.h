@@ -28,6 +28,10 @@
 #include <rthw.h>
 #include "rti_config.h"
 
+#define   RTI_LOG                   (0u)
+#define   RTI_WARNING               (1u)
+#define   RTI_ERROR                 (2u)
+
 /* rti events. First 32 IDs from 0 .. 31 are Compatible for Systemvie */
 #define   RTI_ID_NOP                (0u)
 #define   RTI_ID_OVERFLOW           (1u)
@@ -127,5 +131,6 @@ void rti_trace_disable(rt_uint16_t flag);
 rt_size_t rti_data_get(rt_uint8_t *ptr, rt_uint16_t length);
 rt_size_t rti_buffer_used(void);
 void rti_data_new_data_notify_set_hook(void (*hook)(void));
+void rti_print(const char *s);
 
 #endif
