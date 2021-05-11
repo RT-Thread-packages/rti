@@ -65,6 +65,7 @@ static void rti_isr_enter(void);
 static void rti_isr_exit(void);
 static void rti_isr_to_scheduler(void);
 static void rti_enter_timer(rt_uint32_t timer);
+static void rti_exit_timer(rt_uint32_t timer);
 static void rti_thread_start_exec(rt_uint32_t thread);
 static void rti_thread_stop_exec(void);
 static void rti_thread_start_ready(rt_uint32_t thread);
@@ -86,12 +87,13 @@ static rt_uint8_t *rti_encode_str(rt_uint8_t *present, const char *ptr, rt_uint8
 static rt_uint32_t rti_shrink_id(rt_uint32_t Id);
 
 /* rti hook functions */
-static void rti_timer_timeout(rt_timer_t t);
+static void rti_timer_enter(rt_timer_t t);
+static void rti_timer_exit(rt_timer_t t);
 static void rti_thread_inited(rt_thread_t thread);
 static void rti_thread_suspend(rt_thread_t thread);
 static void rti_thread_resume(rt_thread_t thread);
 static void rti_scheduler(rt_thread_t from, rt_thread_t to);
-static void rti_object_attach(rt_object_t object);
+//static void rti_object_attach(rt_object_t object);
 static void rti_object_detach(rt_object_t object);
 static void rti_interrupt_enter(void);
 static void rti_interrupt_leave(void);
@@ -103,11 +105,18 @@ static int rti_init(void);
 static rt_size_t rti_data_put(const rt_uint8_t *ptr, rt_uint16_t length);
 
 /* rti hook functions */
-static void rti_timer_timeout(rt_timer_t t)
+static void rti_timer_enter(rt_timer_t t)
 {
     if (!rti_status.enable || rti_status.disable_nest[RTI_TIMER_NUM])
         return ;
     rti_enter_timer((rt_uint32_t)t);
+}
+
+static void rti_timer_exit(rt_timer_t t)
+{
+    if (!rti_status.enable || rti_status.disable_nest[RTI_TIMER_NUM])
+        return ;
+    rti_exit_timer((rt_uint32_t)t);
 }
 
 static void rti_thread_inited(rt_thread_t thread)
@@ -115,6 +124,7 @@ static void rti_thread_inited(rt_thread_t thread)
     if (!rti_status.enable || rti_status.disable_nest[RTI_THREAD_NUM])
         return ;
     rti_thread_create((rt_uint32_t)thread);
+    rti_send_thread_info(thread);
 }
 
 static void rti_thread_suspend(rt_thread_t thread)
@@ -142,26 +152,26 @@ static void rti_scheduler(rt_thread_t from, rt_thread_t to)
         rti_thread_start_exec((rt_uint32_t)to);
 }
 
-static void rti_object_attach(rt_object_t object)
-{
-    if (!rti_status.enable || rti_status.disable_nest[RTI_THREAD_NUM])
-        return ;
-    switch (object->type)
-    {
-    case RT_Object_Class_Thread:
-        rti_thread_create((rt_uint32_t)object);
-        rti_send_thread_info((rt_thread_t)object);
-        break;
-    default:
-        break;
-    }
-}
+//static void rti_object_attach(rt_object_t object)
+//{
+//    if (!rti_status.enable || rti_status.disable_nest[RTI_THREAD_NUM])
+//        return ;
+//    switch (object->type & (~RT_Object_Class_Static))
+//    {
+//    case RT_Object_Class_Thread:
+//        rti_thread_create((rt_uint32_t)object);
+//        rti_send_thread_info((rt_thread_t)object);
+//        break;
+//    default:
+//        break;
+//    }
+//}
 
 static void rti_object_detach(rt_object_t object)
 {
     if (!rti_status.enable || rti_status.disable_nest[RTI_THREAD_NUM])
         return ;
-    switch (object->type)
+    switch (object->type & (~RT_Object_Class_Static))
     {
     case RT_Object_Class_Thread:
         rti_thread_stop_exec();
@@ -414,6 +424,11 @@ static void rti_enter_timer(rt_uint32_t timer)
     rti_send_packet_value(RTI_ID_TIMER_ENTER, rti_shrink_id(timer));
 }
 
+static void rti_exit_timer(rt_uint32_t timer)
+{
+    rti_send_packet_void(RTI_ID_TIMER_EXIT);
+}
+
 static void rti_thread_start_exec(rt_uint32_t thread)
 {
     rti_send_packet_value(RTI_ID_THREAD_START_EXEC, rti_shrink_id(thread));
@@ -549,6 +564,19 @@ static void rti_send_packet_value(rt_uint8_t rti_id, rt_uint32_t value)
     rti_send_packet(rti_id, start, present);
 }
 
+void rti_print(const char *s)
+{
+    rt_uint8_t packet[RTI_INFO_SIZE + 2 * RTI_VALUE_SIZE + RTI_MAX_STRING_LEN];
+    rt_uint8_t *start, *present;
+
+    start = rti_record_ready(packet);
+    present = rti_encode_str(start, s, RTI_MAX_STRING_LEN);
+    present = rti_encode_val(present, RTI_LOG);
+    present = rti_encode_val(present, 0);
+
+    rti_send_packet(RTI_ID_PRINT_FORMATTED, start, present);
+}
+
 static void rti_send_packet(rt_uint8_t rti_id, rt_uint8_t *packet_sta, rt_uint8_t *packet_end)
 {
     rt_uint16_t  len;
@@ -602,7 +630,9 @@ static void rti_send_packet(rt_uint8_t rti_id, rt_uint8_t *packet_sta, rt_uint8_
     rti_status.time_stamp_last = time_stamp;
 }
 
-/* rti api */
+/*
+ * rti api function.
+ */
 void rti_data_new_data_notify_set_hook(void (*hook)(void))
 {
     rti_data_new_data_notify = hook;
@@ -737,7 +767,7 @@ static int rti_init(void)
         return -1;
     }
     /* register hooks */
-    rt_object_attach_sethook(rti_object_attach);
+    //rt_object_attach_sethook(rti_object_attach);
     rt_object_detach_sethook(rti_object_detach);
     rt_object_trytake_sethook(rti_object_trytake);
     rt_object_take_sethook(rti_object_take);
@@ -748,7 +778,8 @@ static int rti_init(void)
     rt_thread_inited_sethook(rti_thread_inited);
     rt_scheduler_sethook(rti_scheduler);
 
-    rt_timer_timeout_sethook(rti_timer_timeout);
+    rt_timer_enter_sethook(rti_timer_enter);
+    rt_timer_exit_sethook(rti_timer_exit);
 
     rt_interrupt_enter_sethook(rti_interrupt_enter);
     rt_interrupt_leave_sethook(rti_interrupt_leave);
