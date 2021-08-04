@@ -42,6 +42,17 @@
 static rt_uint8_t transit_buf[TRANSIT_BUF_SIZE];
 static rt_device_t rti_dev;
 
+#define REV_START_FIRSE_FARAM_BYTE0 0x53
+#define REV_START_FIRSE_FARAM_BYTE1 0x56
+#define REV_START_SECOND_FARAM_BYTE 0x01
+#define REV_STOP_FARAM_BYTE 0x02
+
+#define REV_START_FIRST_FARAM_SIZE 4
+
+static struct rt_semaphore rx_sem;
+static char rti_rx_stack[1024];
+static struct rt_thread rti_rx_th;
+
 void rti_data_new_data_notify(void)
 {
     int ret = rti_data_get(transit_buf, TRANSIT_BUF_SIZE);
@@ -50,9 +61,54 @@ void rti_data_new_data_notify(void)
 
 rt_err_t rt_ind(rt_device_t dev, rt_size_t size)
 {
-    rti_data_new_data_notify_set_hook(rti_data_new_data_notify);
-    rti_start();
+    //rti_data_new_data_notify_set_hook(rti_data_new_data_notify);
+    //rti_start();
+	rt_sem_release(&rx_sem);
     return 0;
+}
+
+static void rti_rx_entry(void *param)
+{
+	char ch;
+
+	rt_uint8_t rx_cnt = 0;	
+	rt_uint8_t rx_buff[REV_START_FIRST_FARAM_SIZE];
+
+	while(1)
+	{
+		while (rt_device_read(rti_dev, -1, &ch, 1) != 1)
+		{
+			rx_cnt = 0;		
+			rt_sem_take(&rx_sem, RT_WAITING_FOREVER);		
+		}
+		
+		//rt_kprintf("%02X ",ch);
+		
+		rx_buff[rx_cnt++] = ch;			
+		
+		if(rx_cnt==REV_START_FIRST_FARAM_SIZE)
+		{
+			if(rx_buff[0] == REV_START_FIRSE_FARAM_BYTE0 && rx_buff[1] == REV_START_FIRSE_FARAM_BYTE1)
+			{
+				rti_data_new_data_notify_set_hook(rti_data_new_data_notify);
+				rti_start();
+			}
+			
+			rx_cnt = 0;
+		}		
+		
+		if(ch == REV_START_SECOND_FARAM_BYTE)
+		{
+			rti_data_new_data_notify_set_hook(rti_data_new_data_notify);
+			rti_start();
+		}
+		
+		if(ch == REV_STOP_FARAM_BYTE)
+		{					
+			rti_stop();
+			rti_data_new_data_notify_set_hook(NULL);
+		}
+	}
 }
 
 void rti_uart_sample(void)
@@ -73,6 +129,9 @@ void rti_uart_sample(void)
 
     rt_device_set_rx_indicate(rti_dev, rt_ind);
     rt_device_open(rti_dev, RT_DEVICE_OFLAG_RDWR | RT_DEVICE_FLAG_INT_RX);
+	
+	rt_thread_init(&rti_rx_th,"rti_rx",rti_rx_entry,RT_NULL,&rti_rx_stack[0],sizeof(rti_rx_stack),20 - 1, 20);
+    rt_thread_startup(&rti_rx_th);
 }
 #ifdef RT_USING_FINSH
 MSH_CMD_EXPORT(rti_uart_sample, start record by uart.);

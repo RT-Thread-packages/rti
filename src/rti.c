@@ -713,6 +713,12 @@ void rti_start(void)
 
 void rti_stop(void)
 {
+	rti_send_packet_void(RTI_ID_STOP);
+	rt_thread_delay(50);
+	RT_OBJECT_HOOK_CALL(rti_data_new_data_notify, ());	
+	rt_thread_delay(50);
+	RT_OBJECT_HOOK_CALL(rti_data_new_data_notify, ());
+	
     rti_status.enable = RTI_DISABLE;
     rt_kprintf("rti stop\n");
     if (rti_thread != RT_NULL)
