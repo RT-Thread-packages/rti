@@ -40,16 +40,16 @@
 static struct
 {
     rt_uint32_t time_stamp_last;
-    
+
     /* rti overflow packet count*/
     rt_uint32_t packet_count;
-    
+
     /* rti enable status*/
     rt_uint8_t  enable;
-    
+
     /* event disable nest*/
     rt_uint8_t  disable_nest[RTI_TRACE_NUM];
-    
+
 } rti_status;
 
 struct rt_ringbuffer *tx_ringbuffer = RT_NULL;
@@ -713,12 +713,12 @@ void rti_start(void)
 
 void rti_stop(void)
 {
-	rti_send_packet_void(RTI_ID_STOP);
-	rt_thread_delay(50);
-	RT_OBJECT_HOOK_CALL(rti_data_new_data_notify, ());	
-	rt_thread_delay(50);
-	RT_OBJECT_HOOK_CALL(rti_data_new_data_notify, ());
-	
+    rti_send_packet_void(RTI_ID_STOP);
+    rt_thread_delay(50);
+    RT_OBJECT_HOOK_CALL(rti_data_new_data_notify, ());
+    rt_thread_delay(50);
+    RT_OBJECT_HOOK_CALL(rti_data_new_data_notify, ());
+
     rti_status.enable = RTI_DISABLE;
     rt_kprintf("rti stop\n");
     if (rti_thread != RT_NULL)
