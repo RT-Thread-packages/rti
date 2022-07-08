@@ -36,6 +36,9 @@
     #else
         #define RTI_GET_ISR_ID()   ((*(rt_uint32_t *)(0xE000ED04)) & 0x3F) // Get the currently active interrupt Id. (i.e. read Cortex-M ICSR[5:0] = active vector)
     #endif
+#elif defined(ARCH_ARM_GIC)
+    #undef RTI_GET_ISR_ID()
+    void rti_interrupt_gic_enter(int irqno);                               // Call in GIC interrupt handler function
 #else
     #error "This kernel is not currently supported, You can implement this function yourself"
     #define RTI_GET_ISR_ID()                                               // Get the currently active interrupt Id from the user-provided function.

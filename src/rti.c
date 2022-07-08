@@ -188,6 +188,15 @@ static void rti_interrupt_enter(void)
     rti_isr_enter();
 }
 
+#ifdef ARCH_ARM_GIC
+void rti_interrupt_gic_enter(int irqno)
+{
+    if (!rti_status.enable || rti_status.disable_nest[RTI_INTERRUPT_NUM])
+        return ;
+    rti_send_packet_value(RTI_ID_ISR_ENTER, irqno);
+}
+#endif
+
 static void rti_interrupt_leave(void)
 {
     rt_thread_t current;
@@ -787,7 +796,9 @@ static int rti_init(void)
     rt_timer_enter_sethook(rti_timer_enter);
     rt_timer_exit_sethook(rti_timer_exit);
 
+#ifndef ARCH_ARM_GIC
     rt_interrupt_enter_sethook(rti_interrupt_enter);
+#endif
     rt_interrupt_leave_sethook(rti_interrupt_leave);
 
     return 0;
