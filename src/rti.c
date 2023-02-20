@@ -65,7 +65,7 @@ static void rti_isr_enter(void);
 static void rti_isr_exit(void);
 static void rti_isr_to_scheduler(void);
 static void rti_enter_timer(rt_uint32_t timer);
-static void rti_exit_timer(rt_uint32_t timer);
+static void rti_exit_timer(void);
 static void rti_thread_start_exec(rt_uint32_t thread);
 static void rti_thread_stop_exec(void);
 static void rti_thread_start_ready(rt_uint32_t thread);
@@ -104,6 +104,10 @@ static void rti_object_put(rt_object_t object);
 static int rti_init(void);
 static rt_size_t rti_data_put(const rt_uint8_t *ptr, rt_uint16_t length);
 
+#ifndef __on_rti_data_new_data_notify
+    #define __on_rti_data_new_data_notify()          __ON_HOOK_ARGS(rti_data_new_data_notify, ())
+#endif
+
 /* rti hook functions */
 static void rti_timer_enter(rt_timer_t t)
 {
@@ -116,7 +120,7 @@ static void rti_timer_exit(rt_timer_t t)
 {
     if (!rti_status.enable || rti_status.disable_nest[RTI_TIMER_NUM])
         return ;
-    rti_exit_timer((rt_uint32_t)t);
+    rti_exit_timer();
 }
 
 static void rti_thread_inited(rt_thread_t thread)
@@ -424,7 +428,7 @@ static void rti_enter_timer(rt_uint32_t timer)
     rti_send_packet_value(RTI_ID_TIMER_ENTER, rti_shrink_id(timer));
 }
 
-static void rti_exit_timer(rt_uint32_t timer)
+static void rti_exit_timer(void)
 {
     rti_send_packet_void(RTI_ID_TIMER_EXIT);
 }

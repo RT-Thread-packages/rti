@@ -115,6 +115,8 @@ void rti_uart_sample(void)
 {
     struct serial_configure config = RT_SERIAL_CONFIG_DEFAULT;
 
+    rt_sem_init(&rx_sem, "rti_sem", 0, RT_IPC_FLAG_FIFO);
+
     rti_dev = rt_console_get_device();
 
 #ifdef RT_USING_FINSH
